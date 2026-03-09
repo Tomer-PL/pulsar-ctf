@@ -1,0 +1,50 @@
+#!/bin/bash
+# Wrapper around curl that blocks access to the Docker socket.
+# Passes through all other curl commands to the real curl binary.
+
+REAL_CURL=""
+# Find the real curl binary (skip ourselves)
+for p in /usr/bin/curl /usr/local/bin/curl /opt/homebrew/bin/curl; do
+    if [ -x "$p" ] && [ "$p" != "$0" ]; then
+        REAL_CURL="$p"
+        break
+    fi
+done
+
+if [ -z "$REAL_CURL" ]; then
+    echo "ERROR: Could not find real curl binary" >&2
+    exit 1
+fi
+
+# Check all arguments for docker socket access
+for arg in "$@"; do
+    case "$arg" in
+        *docker.sock*|*/var/run/docker*|*unix-socket*docker*)
+            echo "ERROR: Access to Docker socket is blocked." >&2
+            if [ -n "$ATTDEF_AUDIT_LOG" ]; then
+                echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) BLOCKED curl $*" >> "$ATTDEF_AUDIT_LOG"
+            fi
+            exit 1
+            ;;
+    esac
+done
+
+# Check for --unix-socket flag specifically
+prev=""
+for arg in "$@"; do
+    if [ "$prev" = "--unix-socket" ]; then
+        case "$arg" in
+            *docker*|*/var/run/*)
+                echo "ERROR: Access to Docker socket is blocked." >&2
+                if [ -n "$ATTDEF_AUDIT_LOG" ]; then
+                    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) BLOCKED curl --unix-socket $arg" >> "$ATTDEF_AUDIT_LOG"
+                fi
+                exit 1
+                ;;
+        esac
+    fi
+    prev="$arg"
+done
+
+# All clear — pass through to real curl
+exec "$REAL_CURL" "$@"

@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+*.pyo
+logs/
+.pytest_cache/
+challenges-source/
+*.egg-info/
+dist/
+build/
+
+# GPT-generated exploit scripts (game artifacts, not infra)
+exploit*.py
+auto_submit*.py
+run_attacks.sh
+patches/
+
+# Misc
+.DS_Store
+-d
+compose
+docker

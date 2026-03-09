@@ -1,0 +1,124 @@
+services:
+  # === Game Server ===
+  game-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.gameserver
+    ports:
+      - "8888:8888"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./logs:/app/logs
+      - ./challenges-source:/app/challenges-source
+    networks:
+      - game-net
+    depends_on:
+      - claude-axis
+      - claude-ico
+      - claude-nilua
+      - gpt-axis
+      - gpt-ico
+      - gpt-nilua
+      - gemini-axis
+      - gemini-ico
+      - gemini-nilua
+
+  # === CLAUDE team services ===
+  claude-axis:
+    build:
+      context: ./challenges-source/axis
+      dockerfile: Dockerfile
+    container_name: attdef-claude-axis
+    ports:
+      - "14000:4000"
+    networks:
+      - game-net
+
+  claude-ico:
+    build:
+      context: ./challenges-source/ico
+      dockerfile: Dockerfile
+    container_name: attdef-claude-ico
+    ports:
+      - "14265:4265"
+    networks:
+      - game-net
+
+  claude-nilua:
+    build:
+      context: ./challenges-source/nilua
+      dockerfile: Dockerfile
+      target: nilua
+    container_name: attdef-claude-nilua
+    ports:
+      - "18080:8080"
+    networks:
+      - game-net
+
+  # === GPT team services ===
+  gpt-axis:
+    build:
+      context: ./challenges-source/axis
+      dockerfile: Dockerfile
+    container_name: attdef-gpt-axis
+    ports:
+      - "24000:4000"
+    networks:
+      - game-net
+
+  gpt-ico:
+    build:
+      context: ./challenges-source/ico
+      dockerfile: Dockerfile
+    container_name: attdef-gpt-ico
+    ports:
+      - "24265:4265"
+    networks:
+      - game-net
+
+  gpt-nilua:
+    build:
+      context: ./challenges-source/nilua
+      dockerfile: Dockerfile
+      target: nilua
+    container_name: attdef-gpt-nilua
+    ports:
+      - "28080:8080"
+    networks:
+      - game-net
+
+  # === GEMINI team services ===
+  gemini-axis:
+    build:
+      context: ./challenges-source/axis
+      dockerfile: Dockerfile
+    container_name: attdef-gemini-axis
+    ports:
+      - "34000:4000"
+    networks:
+      - game-net
+
+  gemini-ico:
+    build:
+      context: ./challenges-source/ico
+      dockerfile: Dockerfile
+    container_name: attdef-gemini-ico
+    ports:
+      - "34265:4265"
+    networks:
+      - game-net
+
+  gemini-nilua:
+    build:
+      context: ./challenges-source/nilua
+      dockerfile: Dockerfile
+      target: nilua
+    container_name: attdef-gemini-nilua
+    ports:
+      - "38080:8080"
+    networks:
+      - game-net
+
+networks:
+  game-net:
+    driver: bridge
