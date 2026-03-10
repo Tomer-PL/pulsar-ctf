@@ -23,7 +23,7 @@ import pytest
 def _containers_running() -> bool:
     try:
         result = subprocess.run(
-            ["docker", "inspect", "--format", "{{.State.Running}}", "attdef-claude-axis"],
+            ["docker", "inspect", "--format", "{{.State.Running}}", "pulsar-claude-axis"],
             capture_output=True, text=True, timeout=5,
         )
         return result.stdout.strip() == "true"
@@ -48,7 +48,6 @@ pytestmark = pytest.mark.skipif(
 HOST_PORTS = {
     "claude": {"axis": 14000, "ico": 14265, "nilua": 18080},
     "gpt": {"axis": 24000, "ico": 24265, "nilua": 28080},
-    "gemini": {"axis": 34000, "ico": 34265, "nilua": 38080},
 }
 
 
@@ -57,7 +56,7 @@ def submit_patch(team: str, service: str) -> dict:
     data = json.dumps({
         "team": team,
         "service": service,
-        "build_context": f"/usr/local/workspace/AttDef/challenges-source/{service}",
+        "build_context": f"/usr/local/workspace/pulsar-ctf/challenges-source/{service}",
     }).encode()
     req = urllib.request.Request(
         "http://localhost:8888/api/patch/submit",
@@ -137,60 +136,60 @@ class TestAxisPatchDeploy:
     """Test patching the axis service end-to-end."""
 
     def test_patch_accepted(self):
-        result = submit_patch("gemini", "axis")
+        result = submit_patch("gpt", "axis")
         assert result["accepted"], f"Patch rejected: {result['message']}"
 
     def test_service_reachable_after_patch(self):
-        submit_patch("gemini", "axis")
+        submit_patch("gpt", "axis")
         time.sleep(3)
-        assert check_tcp("localhost", HOST_PORTS["gemini"]["axis"]), \
+        assert check_tcp("localhost", HOST_PORTS["gpt"]["axis"]), \
             "Axis not reachable on localhost after patch"
 
     def test_http_responds_after_patch(self):
-        submit_patch("gemini", "axis")
+        submit_patch("gpt", "axis")
         time.sleep(3)
-        code = check_http(HOST_PORTS["gemini"]["axis"])
+        code = check_http(HOST_PORTS["gpt"]["axis"])
         assert code >= 200 and code < 400, f"HTTP {code} after patch"
 
     def test_port_mapping_exists_after_patch(self):
-        submit_patch("gemini", "axis")
+        submit_patch("gpt", "axis")
         time.sleep(2)
-        ports = get_container_ports("attdef-gemini-axis")
+        ports = get_container_ports("pulsar-gpt-axis")
         assert "4000" in ports, f"No port mapping found: {ports}"
-        assert str(HOST_PORTS["gemini"]["axis"]) in ports, \
+        assert str(HOST_PORTS["gpt"]["axis"]) in ports, \
             f"Wrong host port: {ports}"
 
     def test_flag_plant_works_after_patch(self):
-        submit_patch("gemini", "axis")
+        submit_patch("gpt", "axis")
         time.sleep(3)
-        assert plant_flag("attdef-gemini-axis", "FLAG{post_patch_test}")
-        assert read_flag("attdef-gemini-axis") == "FLAG{post_patch_test}"
+        assert plant_flag("pulsar-gpt-axis", "FLAG{post_patch_test}")
+        assert read_flag("pulsar-gpt-axis") == "FLAG{post_patch_test}"
 
 
 class TestIcoPatchDeploy:
     """Test patching the ico service end-to-end."""
 
     def test_patch_accepted(self):
-        result = submit_patch("gemini", "ico")
+        result = submit_patch("gpt", "ico")
         assert result["accepted"], f"Patch rejected: {result['message']}"
 
     def test_service_reachable_after_patch(self):
-        submit_patch("gemini", "ico")
+        submit_patch("gpt", "ico")
         time.sleep(3)
-        assert check_tcp("localhost", HOST_PORTS["gemini"]["ico"]), \
+        assert check_tcp("localhost", HOST_PORTS["gpt"]["ico"]), \
             "ICO not reachable on localhost after patch"
 
     def test_protocol_responds_after_patch(self):
-        submit_patch("gemini", "ico")
+        submit_patch("gpt", "ico")
         time.sleep(3)
-        assert check_ico_protocol(HOST_PORTS["gemini"]["ico"]), \
+        assert check_ico_protocol(HOST_PORTS["gpt"]["ico"]), \
             "ICO protocol check failed after patch"
 
     def test_port_mapping_exists_after_patch(self):
-        submit_patch("gemini", "ico")
+        submit_patch("gpt", "ico")
         time.sleep(2)
-        ports = get_container_ports("attdef-gemini-ico")
-        assert str(HOST_PORTS["gemini"]["ico"]) in ports, \
+        ports = get_container_ports("pulsar-gpt-ico")
+        assert str(HOST_PORTS["gpt"]["ico"]) in ports, \
             f"Wrong host port: {ports}"
 
 
@@ -198,35 +197,35 @@ class TestNiluaPatchDeploy:
     """Test patching the nilua service end-to-end."""
 
     def test_patch_accepted(self):
-        result = submit_patch("gemini", "nilua")
+        result = submit_patch("gpt", "nilua")
         assert result["accepted"], f"Patch rejected: {result['message']}"
 
     def test_service_reachable_after_patch(self):
-        submit_patch("gemini", "nilua")
+        submit_patch("gpt", "nilua")
         time.sleep(5)  # nilua needs more startup time
-        assert check_tcp("localhost", HOST_PORTS["gemini"]["nilua"]), \
+        assert check_tcp("localhost", HOST_PORTS["gpt"]["nilua"]), \
             "Nilua not reachable on localhost after patch"
 
     def test_port_mapping_exists_after_patch(self):
-        submit_patch("gemini", "nilua")
+        submit_patch("gpt", "nilua")
         time.sleep(2)
-        ports = get_container_ports("attdef-gemini-nilua")
-        assert str(HOST_PORTS["gemini"]["nilua"]) in ports, \
+        ports = get_container_ports("pulsar-gpt-nilua")
+        assert str(HOST_PORTS["gpt"]["nilua"]) in ports, \
             f"Wrong host port: {ports}"
 
 
 class TestPatchDoesNotBreakOtherTeams:
     """Verify patching one team doesn't affect other teams' services."""
 
-    def test_claude_axis_still_works_after_gemini_patch(self):
-        submit_patch("gemini", "axis")
+    def test_claude_axis_still_works_after_gpt_patch(self):
+        submit_patch("gpt", "axis")
         time.sleep(3)
         code = check_http(HOST_PORTS["claude"]["axis"])
         assert code >= 200 and code < 400, \
-            f"Claude's axis broken after Gemini patch: HTTP {code}"
+            f"Claude's axis broken after GPT patch: HTTP {code}"
 
-    def test_claude_ico_still_works_after_gemini_patch(self):
-        submit_patch("gemini", "ico")
+    def test_claude_ico_still_works_after_gpt_patch(self):
+        submit_patch("gpt", "ico")
         time.sleep(3)
         assert check_ico_protocol(HOST_PORTS["claude"]["ico"]), \
-            "Claude's ico broken after Gemini patch"
+            "Claude's ico broken after GPT patch"

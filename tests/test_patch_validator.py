@@ -44,12 +44,12 @@ class TestGetContainerIp:
         mock_run.return_value = MagicMock(
             returncode=0, stdout="10.10.1.10\n"
         )
-        assert _get_container_ip("attdef-claude-axis") == "10.10.1.10"
+        assert _get_container_ip("pulsar-claude-axis") == "10.10.1.10"
 
     @patch("game_server.patch_validator.subprocess.run")
     def test_returns_none_on_empty_output(self, mock_run):
         mock_run.return_value = MagicMock(returncode=0, stdout="\n")
-        assert _get_container_ip("attdef-claude-axis") is None
+        assert _get_container_ip("pulsar-claude-axis") is None
 
     @patch("game_server.patch_validator.subprocess.run")
     def test_returns_none_on_nonzero_returncode(self, mock_run):
@@ -59,12 +59,12 @@ class TestGetContainerIp:
     @patch("game_server.patch_validator.subprocess.run")
     def test_returns_none_on_timeout(self, mock_run):
         mock_run.side_effect = subprocess.TimeoutExpired(cmd="docker", timeout=10)
-        assert _get_container_ip("attdef-claude-axis") is None
+        assert _get_container_ip("pulsar-claude-axis") is None
 
     @patch("game_server.patch_validator.subprocess.run")
     def test_returns_none_on_process_error(self, mock_run):
         mock_run.side_effect = subprocess.CalledProcessError(1, "docker")
-        assert _get_container_ip("attdef-claude-axis") is None
+        assert _get_container_ip("pulsar-claude-axis") is None
 
 
 class TestCheckTcpConnect:
@@ -373,27 +373,6 @@ class TestValidateAndDeployPatch:
         assert success is True
         assert "deployed" in msg.lower()
 
-    @patch("game_server.patch_validator._get_container_ip")
-    @patch("game_server.patch_validator._get_health_check")
-    @patch("game_server.patch_validator.time.sleep")
-    @patch("game_server.patch_validator._cleanup_test_container")
-    @patch("game_server.patch_validator.subprocess.run")
-    def test_deploy_fails_without_container_ip(
-        self, mock_run, mock_cleanup, mock_sleep, mock_get_check, mock_ip
-    ):
-        mock_run.return_value = MagicMock(returncode=0)
-        mock_check = MagicMock(return_value=(True, "HTTP 200"))
-        mock_get_check.return_value = mock_check
-
-        # Can't determine current container IP
-        mock_ip.return_value = None
-
-        success, msg = validate_and_deploy_patch(
-            TeamName.CLAUDE, ServiceName.AXIS, "/some/path"
-        )
-        assert success is False
-        assert "could not determine" in msg.lower()
-
     @patch("game_server.patch_validator._cleanup_test_container")
     @patch("game_server.patch_validator.subprocess.run")
     def test_nilua_uses_target_flag(self, mock_run, mock_cleanup):
@@ -403,7 +382,7 @@ class TestValidateAndDeployPatch:
         )
 
         validate_and_deploy_patch(
-            TeamName.GEMINI, ServiceName.NILUA, "/some/path"
+            TeamName.GPT, ServiceName.NILUA, "/some/path"
         )
 
         # Check that docker build was called with --target nilua
@@ -431,4 +410,4 @@ class TestValidateAndDeployPatch:
         )
         assert success is False
         assert "Failed to start test container" in msg
-        mock_cleanup.assert_called_with("attdef-test-claude-axis")
+        mock_cleanup.assert_called_with("pulsar-test-claude-axis")

@@ -3,7 +3,7 @@
 # Keeps the LLM running in a loop, re-prompting each tick until the game ends.
 #
 # Usage: bash run_loop.sh <team> [max_rounds]
-#   team: claude | gpt | gemini
+#   team: claude | gpt
 #   max_rounds: optional, stop after N rounds (default: unlimited)
 
 set -euo pipefail
@@ -11,12 +11,13 @@ set -euo pipefail
 TEAM="${1:?Usage: bash run_loop.sh <team> [max_rounds]}"
 MAX_ROUNDS="${2:-0}"  # 0 = unlimited
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+HARNESS_DIR="$SCRIPT_DIR"  # preserved copy — setup_env.sh overwrites SCRIPT_DIR
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-GAME_SERVER="http://localhost:8888"
+GAME_SERVER="${GAME_SERVER:-http://localhost:8888}"
 ROUND=0
 
 echo "============================================"
-echo "  AttDef Agent Loop: ${TEAM}"
+echo "  Pulsar Agent Loop: ${TEAM}"
 echo "  Max rounds: ${MAX_ROUNDS:-unlimited}"
 echo "============================================"
 
@@ -93,21 +94,18 @@ Continue from where you left off. Your previous exploit scripts and patches shou
     # Run the appropriate LLM CLI
     case "$TEAM" in
         claude)
-            unset CLAUDECODE CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY
-            source "${SCRIPT_DIR}/restricted/setup_env.sh" claude 2>/dev/null
-            export ANTHROPIC_API_KEY=$(grep ANTHROPIC_API_KEY /usr/local/workspace/neptune/.env | cut -d= -f2)
-            claude --dangerously-skip-permissions --model claude-sonnet-4-6 -p "${PROMPT}" --output-format text 2>&1 || true
+            source "${SCRIPT_DIR}/restricted/setup_env.sh" claude 2>/dev/null || true
+            if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+                export ANTHROPIC_API_KEY=$(grep ANTHROPIC_API_KEY "${ROOT_DIR}/.env" 2>/dev/null | cut -d= -f2 || true)
+            fi
+            # Use agent.py (Anthropic API with tool use) — streams output
+            python3 -u "${HARNESS_DIR}/claude/agent.py" "${MAX_ROUNDS}" 2>&1 || true
+            # agent.py has its own game loop, so break after it returns
+            break
             ;;
         gpt)
-            source "${SCRIPT_DIR}/restricted/setup_env.sh" gpt 2>/dev/null
+            source "${SCRIPT_DIR}/restricted/setup_env.sh" gpt 2>/dev/null || true
             codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check --model gpt-5.3-codex "${PROMPT}" 2>&1 || true
-            ;;
-        gemini)
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-            nvm use 22 --silent 2>/dev/null || true
-            source "${SCRIPT_DIR}/restricted/setup_env.sh" gemini 2>/dev/null
-            gemini --yolo --sandbox=false -m gemini-2.5-pro -p "${PROMPT}" 2>&1 || true
             ;;
         *)
             echo "Unknown team: ${TEAM}"

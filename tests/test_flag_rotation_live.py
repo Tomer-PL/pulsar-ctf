@@ -20,7 +20,7 @@ import pytest
 def _containers_running() -> bool:
     try:
         result = subprocess.run(
-            ["docker", "inspect", "--format", "{{.State.Running}}", "attdef-claude-axis"],
+            ["docker", "inspect", "--format", "{{.State.Running}}", "pulsar-claude-axis"],
             capture_output=True, text=True, timeout=5,
         )
         return result.stdout.strip() == "true"
@@ -65,25 +65,25 @@ class TestAxisFlagRotation:
     def test_flag_file_updates_in_container(self):
         """After planting, /flag in container has the new value."""
         flag1 = "FLAG{axis_test_rotation_1}"
-        plant_flag("attdef-claude-axis", flag1)
-        assert read_flag_from_container("attdef-claude-axis") == flag1
+        plant_flag("pulsar-claude-axis", flag1)
+        assert read_flag_from_container("pulsar-claude-axis") == flag1
 
         flag2 = "FLAG{axis_test_rotation_2}"
-        plant_flag("attdef-claude-axis", flag2)
-        assert read_flag_from_container("attdef-claude-axis") == flag2
+        plant_flag("pulsar-claude-axis", flag2)
+        assert read_flag_from_container("pulsar-claude-axis") == flag2
 
     def test_flag_readable_by_service_user(self):
         """The nobody user (axis runs as nobody) can read /flag."""
-        plant_flag("attdef-claude-axis", "FLAG{axis_perm_test}")
+        plant_flag("pulsar-claude-axis", "FLAG{axis_perm_test}")
         result = subprocess.run(
-            ["docker", "exec", "-u", "nobody", "attdef-claude-axis", "cat", "/flag"],
+            ["docker", "exec", "-u", "nobody", "pulsar-claude-axis", "cat", "/flag"],
             capture_output=True, text=True, timeout=10,
         )
         assert result.stdout.strip() == "FLAG{axis_perm_test}"
 
     def test_service_still_responds_after_flag_change(self):
         """Axis HTTP still returns 200 after flag rotation."""
-        plant_flag("attdef-claude-axis", "FLAG{axis_http_test}")
+        plant_flag("pulsar-claude-axis", "FLAG{axis_http_test}")
         result = subprocess.run(
             ["curl", "-sf", "-o", "/dev/null", "-w", "%{http_code}", "http://localhost:14000/"],
             capture_output=True, text=True, timeout=10,
@@ -101,16 +101,16 @@ class TestIcoFlagRotation:
 
     def test_flag_file_updates_in_container(self):
         flag1 = "FLAG{ico_test_rotation_1}"
-        plant_flag("attdef-claude-ico", flag1)
-        assert read_flag_from_container("attdef-claude-ico") == flag1
+        plant_flag("pulsar-claude-ico", flag1)
+        assert read_flag_from_container("pulsar-claude-ico") == flag1
 
         flag2 = "FLAG{ico_test_rotation_2}"
-        plant_flag("attdef-claude-ico", flag2)
-        assert read_flag_from_container("attdef-claude-ico") == flag2
+        plant_flag("pulsar-claude-ico", flag2)
+        assert read_flag_from_container("pulsar-claude-ico") == flag2
 
     def test_protocol_responds_after_flag_change(self):
         """ICO still responds to Connect command after flag rotation."""
-        plant_flag("attdef-claude-ico", "FLAG{ico_proto_test}")
+        plant_flag("pulsar-claude-ico", "FLAG{ico_proto_test}")
         time.sleep(0.5)
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -132,8 +132,8 @@ class TestIcoFlagRotation:
         full exploit, but we CAN verify the file is readable per-connection.
         """
         flag1 = "FLAG{ico_conn_test_1}"
-        plant_flag("attdef-claude-ico", flag1)
-        assert read_flag_from_container("attdef-claude-ico") == flag1
+        plant_flag("pulsar-claude-ico", flag1)
+        assert read_flag_from_container("pulsar-claude-ico") == flag1
 
         # Connect — this child process will read flag1
         sock1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -144,7 +144,7 @@ class TestIcoFlagRotation:
 
         # Plant a new flag
         flag2 = "FLAG{ico_conn_test_2}"
-        plant_flag("attdef-claude-ico", flag2)
+        plant_flag("pulsar-claude-ico", flag2)
 
         # New connection should see flag2
         sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -154,7 +154,7 @@ class TestIcoFlagRotation:
         sock2.recv(1)
 
         # Verify from inside container
-        assert read_flag_from_container("attdef-claude-ico") == flag2
+        assert read_flag_from_container("pulsar-claude-ico") == flag2
 
         sock1.sendall(b'\x11')
         sock1.close()
@@ -170,30 +170,30 @@ class TestNiluaFlagRotation:
 
     def test_flag_file_updates_in_container(self):
         flag1 = "FLAG{nilua_test_rotation_1}"
-        plant_flag("attdef-claude-nilua", flag1)
-        assert read_flag_from_container("attdef-claude-nilua") == flag1
+        plant_flag("pulsar-claude-nilua", flag1)
+        assert read_flag_from_container("pulsar-claude-nilua") == flag1
 
     def test_restart_picks_up_new_flag(self):
         """After writing new flag and restarting, nilua serves the new flag."""
         new_flag = "FLAG{nilua_restart_test}"
-        plant_flag("attdef-claude-nilua", new_flag)
+        plant_flag("pulsar-claude-nilua", new_flag)
 
         # Restart the container
         subprocess.run(
-            ["docker", "restart", "attdef-claude-nilua"],
+            ["docker", "restart", "pulsar-claude-nilua"],
             capture_output=True, timeout=30, check=True,
         )
         time.sleep(3)  # wait for nilua to start
 
         # Verify the container is running
         result = subprocess.run(
-            ["docker", "inspect", "--format", "{{.State.Running}}", "attdef-claude-nilua"],
+            ["docker", "inspect", "--format", "{{.State.Running}}", "pulsar-claude-nilua"],
             capture_output=True, text=True, timeout=5,
         )
         assert result.stdout.strip() == "true", "Container not running after restart"
 
         # Verify /flag has the new value
-        assert read_flag_from_container("attdef-claude-nilua") == new_flag
+        assert read_flag_from_container("pulsar-claude-nilua") == new_flag
 
         # Verify service is accepting connections
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -203,9 +203,9 @@ class TestNiluaFlagRotation:
 
     def test_service_still_responsive_after_restart(self):
         """Nilua accepts TCP connections after restart."""
-        plant_flag("attdef-claude-nilua", "FLAG{nilua_responsive_test}")
+        plant_flag("pulsar-claude-nilua", "FLAG{nilua_responsive_test}")
         subprocess.run(
-            ["docker", "restart", "attdef-claude-nilua"],
+            ["docker", "restart", "pulsar-claude-nilua"],
             capture_output=True, timeout=30, check=True,
         )
         time.sleep(3)
@@ -222,9 +222,9 @@ class TestFlagPlantingPermissions:
     """Verify that docker exec -u root can write /flag and service user can read it."""
 
     @pytest.mark.parametrize("container,user", [
-        ("attdef-claude-axis", "nobody"),
-        ("attdef-claude-ico", "root"),  # ico doesn't set USER in final stage
-        ("attdef-claude-nilua", "user"),
+        ("pulsar-claude-axis", "nobody"),
+        ("pulsar-claude-ico", "root"),  # ico doesn't set USER in final stage
+        ("pulsar-claude-nilua", "user"),
     ])
     def test_service_user_can_read_flag(self, container, user):
         test_flag = f"FLAG{{perm_test_{container}}}"

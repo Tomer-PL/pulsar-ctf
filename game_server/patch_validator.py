@@ -1,4 +1,4 @@
-"""Patch validator for the AttDef game.
+"""Patch validator for the Pulsar game.
 
 When an LLM submits a patched Docker image, the validator:
 1. Builds the new image
@@ -30,9 +30,9 @@ def validate_and_deploy_patch(
 
     Returns (success, message).
     """
-    container_name = f"attdef-{team.value}-{service.value}"
-    test_container = f"attdef-test-{team.value}-{service.value}"
-    image_name = f"attdef-patched-{team.value}-{service.value}"
+    container_name = f"pulsar-{team.value}-{service.value}"
+    test_container = f"pulsar-test-{team.value}-{service.value}"
+    image_name = f"pulsar-patched-{team.value}-{service.value}"
 
     # Step 1: Build the patched image
     logger.info("Building patched image for %s/%s", team.value, service.value)
@@ -62,7 +62,7 @@ def validate_and_deploy_patch(
             [
                 "docker", "run", "-d",
                 "--name", test_container,
-                "--network", "attdef_game-net",
+                "--network", "pulsar-ctf_game-net",
                 image_name,
             ],
             capture_output=True, text=True, timeout=30, check=True,
@@ -99,7 +99,7 @@ def validate_and_deploy_patch(
         run_cmd = [
             "docker", "run", "-d",
             "--name", container_name,
-            "--network", "attdef_game-net",
+            "--network", "pulsar-ctf_game-net",
             "-p", f"{host_port}:{internal_port}",
             image_name,
         ]
@@ -124,16 +124,15 @@ def _get_service_port(service: ServiceName) -> int:
 _HOST_PORTS = {
     "claude": {"axis": 14000, "ico": 14265, "nilua": 18080},
     "gpt": {"axis": 24000, "ico": 24265, "nilua": 28080},
-    "gemini": {"axis": 34000, "ico": 34265, "nilua": 38080},
 }
 
 
 def _get_host_port(container_name: str) -> int:
     """Get the host port for a container from our static mapping.
 
-    Container names are like 'attdef-claude-axis'.
+    Container names are like 'pulsar-claude-axis'.
     """
-    parts = container_name.replace("attdef-", "").split("-", 1)
+    parts = container_name.replace("pulsar-", "").split("-", 1)
     if len(parts) == 2:
         team, service = parts
         return _HOST_PORTS.get(team, {}).get(service, 0)

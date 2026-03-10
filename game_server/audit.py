@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 # Legitimate containers the game server may exec into
 GAME_SERVER_CONTAINERS = {
-    f"attdef-{team}-{svc}"
-    for team in ("claude", "gpt", "gemini")
+    f"pulsar-{team}-{svc}"
+    for team in ("claude", "gpt")
     for svc in ("axis", "ico", "nilua")
 }
 
@@ -50,7 +50,7 @@ def _monitor_events() -> None:
             if not line:
                 continue
             # Skip the game server's own operations (flag planting, health checks)
-            if "attdef-game-server" in line:
+            if "pulsar-game-server" in line:
                 continue
             if "echo 'FLAG{" in line:
                 continue

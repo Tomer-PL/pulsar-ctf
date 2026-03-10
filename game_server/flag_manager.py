@@ -40,7 +40,7 @@ class FlagManager:
         nilua_restart_needed: set[str] = set()
 
         for flag in flags:
-            container = f"attdef-{flag.team.value}-{flag.service.value}"
+            container = f"pulsar-{flag.team.value}-{flag.service.value}"
             success = self._write_flag_to_container(container, flag)
             if success:
                 self.state.active_flags[flag.value] = flag
@@ -76,6 +76,11 @@ class FlagManager:
         the container's default user. Sets the file world-readable
         so the service process (running as unprivileged user) can read it.
         """
+        if not self._container_running(container_name):
+            logger.debug(
+                "FLAG_SKIP container=%s not running", container_name
+            )
+            return False
         try:
             subprocess.run(
                 [
@@ -93,6 +98,18 @@ class FlagManager:
             logger.error(
                 "FLAG_WRITE_ERROR container=%s error=%s", container_name, e
             )
+            return False
+
+    @staticmethod
+    def _container_running(container_name: str) -> bool:
+        """Check if a Docker container is running."""
+        try:
+            result = subprocess.run(
+                ["docker", "inspect", "-f", "{{.State.Running}}", container_name],
+                capture_output=True, text=True, timeout=5,
+            )
+            return result.stdout.strip() == "true"
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             return False
 
     def _restart_container(self, container_name: str) -> bool:

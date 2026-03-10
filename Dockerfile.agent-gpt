@@ -1,0 +1,21 @@
+FROM node:22-bookworm-slim
+
+# Tools for exploitation + Python for scripting
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl netcat-openbsd gcc make nmap socat \
+    python3 python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Codex CLI (https://github.com/openai/codex)
+RUN npm install -g @openai/codex
+
+WORKDIR /app
+
+COPY harnesses/ ./harnesses/
+
+RUN mkdir -p /workspace /patches /app/logs \
+    && chmod +x /app/harnesses/entrypoint.sh
+
+WORKDIR /workspace
+
+ENTRYPOINT ["bash", "/app/harnesses/entrypoint.sh"]

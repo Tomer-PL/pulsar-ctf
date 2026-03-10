@@ -36,12 +36,16 @@ logging.getLogger().addHandler(_file_handler)
 
 logger = logging.getLogger(__name__)
 
-# Port mapping: team -> service -> host port
-# LLMs connect to localhost:<host_port>
+# Port mapping: team -> service -> host port (for host-based access / dashboard)
 HOST_PORTS = {
     "claude": {"axis": 14000, "ico": 14265, "nilua": 18080},
     "gpt": {"axis": 24000, "ico": 24265, "nilua": 28080},
-    "gemini": {"axis": 34000, "ico": 34265, "nilua": 38080},
+}
+
+# Internal Docker network addresses (for containerized agents)
+INTERNAL_ADDRESSES = {
+    "claude": {"axis": "claude-axis:4000", "ico": "claude-ico:4265", "nilua": "claude-nilua:8080"},
+    "gpt": {"axis": "gpt-axis:4000", "ico": "gpt-ico:4265", "nilua": "gpt-nilua:8080"},
 }
 
 # --- Game initialization ---
@@ -50,7 +54,7 @@ state = GameState(config=config)
 flag_manager = FlagManager(state)
 scorer = Scorer(state)
 
-app = FastAPI(title="AttDef - LLM Attack-Defense CTF", version="1.0.0")
+app = FastAPI(title="Pulsar - LLM Attack-Defense CTF", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -207,11 +211,15 @@ async def submit_patch(req: PatchRequest) -> PatchResponse:
             detail=f"Unknown service: {req.service}. Valid: {[s.value for s in ServiceName]}",
         )
 
-    # Remap host paths to container paths
-    # LLMs send paths like /usr/local/workspace/AttDef/challenges-source/axis
-    # but inside this container, source is at /app/challenges-source/axis
+    # Remap agent paths to game server container paths.
+    # Containerized agents send /patches/<service> (from their shared patch volume).
+    # Host-based agents send paths containing /challenges-source/<service>.
     build_context = req.build_context
-    if "/challenges-source/" in build_context:
+    if build_context.startswith("/patches/"):
+        # Containerized agent: /patches/<service> → /patches/<team>/<service>
+        rel_path = build_context[len("/patches/"):]
+        build_context = f"/patches/{team.value}/{rel_path}"
+    elif "/challenges-source/" in build_context:
         service_dir = build_context.split("/challenges-source/")[-1]
         build_context = f"/app/challenges-source/{service_dir}"
     logger.info("PATCH_REQUEST team=%s service=%s path=%s", team.value, service.value, build_context)
@@ -303,6 +311,7 @@ async def get_game_config() -> dict:
         "services": [s.value for s in config.services],
         "teams": [t.value for t in config.teams],
         "host_ports": HOST_PORTS,
+        "internal_addresses": INTERNAL_ADDRESSES,
         "submission_endpoint": "POST /api/flags/submit {flag: str, team: str}",
         "patch_endpoint": "POST /api/patch/submit {team: str, service: str, build_context: str}",
     }
@@ -314,7 +323,7 @@ async def scoreboard_page() -> str:
     return """<!DOCTYPE html>
 <html>
 <head>
-    <title>AttDef - LLM Attack-Defense CTF</title>
+    <title>Pulsar - LLM Attack-Defense CTF</title>
     <style>
         body { font-family: monospace; background: #0a0a0a; color: #00ff00; padding: 40px; }
         h1 { text-align: center; font-size: 2em; }
@@ -325,14 +334,13 @@ async def scoreboard_page() -> str:
         td { font-size: 1.2em; }
         .team-claude { color: #d4a574; }
         .team-gpt { color: #74b9ff; }
-        .team-gemini { color: #a29bfe; }
         .total { font-weight: bold; font-size: 1.4em; }
         #attacks { max-width: 800px; margin: 30px auto; }
         .attack-entry { color: #ff6b6b; margin: 4px 0; }
     </style>
 </head>
 <body>
-    <h1>AttDef - LLM Attack-Defense CTF</h1>
+    <h1>Pulsar - LLM Attack-Defense CTF</h1>
     <div class="info">
         <span id="tick">Tick: -</span> |
         <span id="remaining">Time: -</span> |

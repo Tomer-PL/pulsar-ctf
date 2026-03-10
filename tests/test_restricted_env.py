@@ -23,7 +23,7 @@ class TestFakeDockerBinary:
 
     def test_docker_exec_blocked(self):
         result = subprocess.run(
-            [FAKE_DOCKER, "exec", "attdef-gpt-axis", "cat", "/flag"],
+            [FAKE_DOCKER, "exec", "pulsar-gpt-axis", "cat", "/flag"],
             capture_output=True, text=True,
         )
         assert result.returncode == 1
@@ -31,7 +31,7 @@ class TestFakeDockerBinary:
 
     def test_docker_cp_blocked(self):
         result = subprocess.run(
-            [FAKE_DOCKER, "cp", "attdef-gpt-axis:/flag", "."],
+            [FAKE_DOCKER, "cp", "pulsar-gpt-axis:/flag", "."],
             capture_output=True, text=True,
         )
         assert result.returncode == 1
@@ -46,14 +46,14 @@ class TestFakeDockerBinary:
 
     def test_docker_stop_blocked(self):
         result = subprocess.run(
-            [FAKE_DOCKER, "stop", "attdef-gpt-axis"],
+            [FAKE_DOCKER, "stop", "pulsar-gpt-axis"],
             capture_output=True, text=True,
         )
         assert result.returncode == 1
 
     def test_docker_inspect_blocked(self):
         result = subprocess.run(
-            [FAKE_DOCKER, "inspect", "attdef-gpt-axis"],
+            [FAKE_DOCKER, "inspect", "pulsar-gpt-axis"],
             capture_output=True, text=True,
         )
         assert result.returncode == 1
@@ -71,9 +71,9 @@ class TestFakeDockerBinary:
 
         try:
             env = os.environ.copy()
-            env["ATTDEF_AUDIT_LOG"] = log_path
+            env["PULSAR_AUDIT_LOG"] = log_path
             subprocess.run(
-                [FAKE_DOCKER, "exec", "attdef-gpt-axis", "cat", "/flag"],
+                [FAKE_DOCKER, "exec", "pulsar-gpt-axis", "cat", "/flag"],
                 capture_output=True, env=env,
             )
             with open(log_path) as f:
@@ -140,7 +140,7 @@ class TestCurlWrapper:
 
         try:
             env = os.environ.copy()
-            env["ATTDEF_AUDIT_LOG"] = log_path
+            env["PULSAR_AUDIT_LOG"] = log_path
             subprocess.run(
                 [
                     CURL_WRAPPER,
@@ -177,7 +177,7 @@ class TestRestrictedEnvironment:
 
     def test_docker_exec_blocked_via_path(self):
         result = self._run_in_restricted_env(
-            "docker exec attdef-gpt-axis cat /flag"
+            "docker exec pulsar-gpt-axis cat /flag"
         )
         assert result.returncode == 1
         assert "disabled" in result.stderr.lower()
@@ -190,7 +190,7 @@ class TestRestrictedEnvironment:
 
     def test_docker_host_set_to_invalid(self):
         result = self._run_in_restricted_env("echo $DOCKER_HOST")
-        assert "attdef-blocked" in result.stdout
+        assert "pulsar-blocked" in result.stdout
 
     def test_restricted_path_has_fake_docker_first(self):
         result = self._run_in_restricted_env("which docker")
@@ -199,7 +199,7 @@ class TestRestrictedEnvironment:
 
     def test_audit_log_created(self):
         result = self._run_in_restricted_env(
-            "echo $ATTDEF_AUDIT_LOG"
+            "echo $PULSAR_AUDIT_LOG"
         )
         assert "audit_testteam.log" in result.stdout
 
@@ -217,7 +217,7 @@ class TestRestrictedEnvironment:
         result = self._run_in_restricted_env(
             'python3 -c "import os; print(os.environ.get(\'DOCKER_HOST\', \'not set\'))"'
         )
-        assert "attdef-blocked" in result.stdout
+        assert "pulsar-blocked" in result.stdout
 
 
 class TestBypassAttempts:

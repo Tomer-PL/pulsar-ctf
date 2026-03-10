@@ -25,8 +25,8 @@ class TestFlagGeneration:
         state = _make_state()
         fm = FlagManager(state)
         flags = fm.generate_tick_flags()
-        # 3 teams * 3 services = 9 flags
-        assert len(flags) == 9
+        # 2 teams * 3 services = 6 flags
+        assert len(flags) == 6
 
     def test_flags_have_correct_format(self):
         state = _make_state()
@@ -136,24 +136,18 @@ class TestFlagSubmission:
         result2 = fm.validate_submission(submission)
         assert result2 is None
 
-    def test_different_team_can_submit_same_flag(self):
+    def test_other_team_can_submit_stolen_flag(self):
         state = _make_state()
         fm = FlagManager(state)
 
         flag = Flag.generate(TeamName.GPT, ServiceName.AXIS, tick=0)
         state.active_flags[flag.value] = flag
 
-        # Claude submits
-        sub1 = FlagSubmission(
+        # Claude submits GPT's flag
+        sub = FlagSubmission(
             flag_value=flag.value, submitting_team=TeamName.CLAUDE
         )
-        assert fm.validate_submission(sub1) is not None
-
-        # Gemini also submits the same flag
-        sub2 = FlagSubmission(
-            flag_value=flag.value, submitting_team=TeamName.GEMINI
-        )
-        assert fm.validate_submission(sub2) is not None
+        assert fm.validate_submission(sub) is not None
 
     def test_submission_tracks_exploited_teams(self):
         state = _make_state()

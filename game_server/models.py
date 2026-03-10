@@ -1,4 +1,4 @@
-"""Data models for the AttDef game server."""
+"""Data models for the Pulsar game server."""
 
 import time
 import uuid
@@ -9,7 +9,6 @@ from enum import Enum
 class TeamName(Enum):
     CLAUDE = "claude"
     GPT = "gpt"
-    GEMINI = "gemini"
 
 
 class ServiceName(Enum):

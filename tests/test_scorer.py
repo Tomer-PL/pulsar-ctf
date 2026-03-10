@@ -41,7 +41,7 @@ class TestAttackScoring:
         state = _make_state()
         scorer = Scorer(state)
 
-        # Claude steals two flags from different teams
+        # Claude steals two flags from GPT on different services
         state.attack_log.append(
             AttackPoint(
                 attacker=TeamName.CLAUDE,
@@ -54,7 +54,7 @@ class TestAttackScoring:
         state.attack_log.append(
             AttackPoint(
                 attacker=TeamName.CLAUDE,
-                victim=TeamName.GEMINI,
+                victim=TeamName.GPT,
                 service=ServiceName.ICO,
                 tick=0,
                 flag_value="FLAG{2}",
@@ -70,12 +70,11 @@ class TestDefenseScoring:
         state = _make_state()
         scorer = Scorer(state)
 
-        # GPT was exploited on axis, but Claude and Gemini were not
+        # GPT was exploited on axis, but Claude was not
         state.exploited_this_tick["axis"] = {"gpt"}
 
         scores = scorer.calculate_tick_scores()
         assert scores["claude"]["defense"] == 1
-        assert scores["gemini"]["defense"] == 1
         assert scores["gpt"]["defense"] == 0
 
     def test_no_defense_points_when_nobody_exploited(self):
@@ -92,7 +91,7 @@ class TestDefenseScoring:
         scorer = Scorer(state)
 
         # Everyone was exploited on axis
-        state.exploited_this_tick["axis"] = {"claude", "gpt", "gemini"}
+        state.exploited_this_tick["axis"] = {"claude", "gpt"}
 
         scores = scorer.calculate_tick_scores()
         for team_scores in scores.values():
@@ -123,13 +122,13 @@ class TestCumulativeScoring:
         state.attack_log.append(
             AttackPoint(
                 attacker=TeamName.CLAUDE,
-                victim=TeamName.GEMINI,
+                victim=TeamName.GPT,
                 service=ServiceName.ICO,
                 tick=1,
                 flag_value="FLAG{2}",
             )
         )
-        state.exploited_this_tick["ico"] = {"gemini"}
+        state.exploited_this_tick["ico"] = {"gpt"}
         scorer.calculate_tick_scores()
 
         assert state.scores["claude"].attack_points == 2
@@ -143,12 +142,10 @@ class TestScoreboard:
 
         state.scores["claude"].attack_points = 5
         state.scores["gpt"].attack_points = 10
-        state.scores["gemini"].attack_points = 3
 
         board = scorer.get_scoreboard()
         assert board[0]["team"] == "gpt"
         assert board[1]["team"] == "claude"
-        assert board[2]["team"] == "gemini"
 
     def test_total_is_sum_of_attack_and_defense(self):
         state = _make_state()
@@ -167,7 +164,7 @@ class TestResetTickTracking:
         state = _make_state()
         scorer = Scorer(state)
 
-        state.exploited_this_tick["axis"] = {"gpt", "gemini"}
+        state.exploited_this_tick["axis"] = {"gpt"}
         scorer.reset_tick_tracking()
 
         for service_exploits in state.exploited_this_tick.values():

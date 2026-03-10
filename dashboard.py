@@ -17,9 +17,9 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import urllib.request
 
-GAME_SERVER = "http://localhost:8888"
-LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
-PORT = 9999
+GAME_SERVER = os.environ.get("GAME_SERVER", "http://localhost:8888")
+LOG_DIR = os.environ.get("LOG_DIR", os.path.join(os.path.dirname(__file__), "logs"))
+PORT = int(os.environ.get("DASHBOARD_PORT", "9999"))
 
 
 def proxy_game_api(path: str) -> bytes:
@@ -49,7 +49,7 @@ def tail_log(pattern: str, lines: int = 50, filter_fn=None) -> str:
 DASHBOARD_HTML = """<!DOCTYPE html>
 <html>
 <head>
-    <title>AttDef Dashboard</title>
+    <title>Pulsar Dashboard</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Menlo', 'Monaco', monospace; background: #0a0a0a; color: #ccc; }
@@ -75,13 +75,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         td { font-size: 1em; }
         .team-claude { color: #d4a574; }
         .team-gpt { color: #74b9ff; }
-        .team-gemini { color: #a29bfe; }
         .total { font-weight: bold; font-size: 1.2em; color: #00ff00; }
 
         .attack-entry { color: #ff6b6b; padding: 3px 0; border-bottom: 1px solid #1a1a1a; }
         .log-claude { color: #d4a574; }
         .log-gpt { color: #74b9ff; }
-        .log-gemini { color: #a29bfe; }
         .log-event { color: #00ff00; }
 
         .tabs { display: flex; gap: 0; }
@@ -94,7 +92,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 </head>
 <body>
     <div class="header">
-        <h1>AttDef - LLM Attack-Defense CTF</h1>
+        <h1>Pulsar - LLM Attack-Defense CTF</h1>
         <div class="meta">
             <span id="tick">Tick: -</span>
             <span id="next-tick">Next tick: -</span>
@@ -130,13 +128,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <div class="tabs">
                     <div class="tab active log-claude" onclick="switchTab('claude')">Claude</div>
                     <div class="tab log-gpt" onclick="switchTab('gpt')">GPT</div>
-                    <div class="tab log-gemini" onclick="switchTab('gemini')">Gemini</div>
                 </div>
             </div>
             <div class="panel-body">
                 <pre id="log-claude" class="tab-content active log-claude"></pre>
                 <pre id="log-gpt" class="tab-content log-gpt"></pre>
-                <pre id="log-gemini" class="tab-content log-gemini"></pre>
             </div>
         </div>
 
@@ -159,9 +155,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
         async function update() {
             try {
-                const [tickR, scoresR, attacksR, claudeR, gptR, geminiR, eventsR, auditR] = await Promise.all([
+                const [tickR, scoresR, attacksR, claudeR, gptR, eventsR, auditR] = await Promise.all([
                     fetch('/api/tick'), fetch('/api/scores'), fetch('/api/attacks'),
-                    fetch('/api/logs/claude'), fetch('/api/logs/gpt'), fetch('/api/logs/gemini'),
+                    fetch('/api/logs/claude'), fetch('/api/logs/gpt'),
                     fetch('/api/logs/events'), fetch('/api/logs/audit'),
                 ]);
                 const tick = await tickR.json();
@@ -189,7 +185,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
                 document.getElementById('log-claude').textContent = await claudeR.text();
                 document.getElementById('log-gpt').textContent = await gptR.text();
-                document.getElementById('log-gemini').textContent = await geminiR.text();
                 // Game events — reverse so newest is on top
                 const eventsText = await eventsR.text();
                 document.getElementById('events').textContent = eventsText.split('\\n').reverse().join('\\n');
@@ -223,14 +218,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._text(tail_log("claude_*.log", 80))
             elif name == "gpt":
                 self._text(tail_log("gpt_*.log", 80))
-            elif name == "gemini":
-                self._text(tail_log("gemini_*.log", 80))
             elif name == "events":
                 # Filter out noisy audit/docker-exec lines from game server's own flag planting
                 self._text(tail_log("game_events.log", 60, filter_fn=lambda l: "AUDIT" not in l and "HTTP/1.1" not in l))
             elif name == "audit":
                 audit = ""
-                for team in ["claude", "gpt", "gemini"]:
+                for team in ["claude", "gpt"]:
                     audit += tail_log(f"audit_{team}.log", 20)
                 self._text(audit or "No audit entries")
             else:

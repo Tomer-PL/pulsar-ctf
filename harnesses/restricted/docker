@@ -6,8 +6,8 @@ echo "Use the game server API for patching: POST /api/patch/submit" >&2
 echo "Use network connections (TCP) for attacking services." >&2
 
 # Log the attempted command for audit
-if [ -n "$ATTDEF_AUDIT_LOG" ]; then
-    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) BLOCKED docker $*" >> "$ATTDEF_AUDIT_LOG"
+if [ -n "$PULSAR_AUDIT_LOG" ]; then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) BLOCKED docker $*" >> "$PULSAR_AUDIT_LOG"
 fi
 
 exit 1

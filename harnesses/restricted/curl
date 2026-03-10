@@ -21,8 +21,8 @@ for arg in "$@"; do
     case "$arg" in
         *docker.sock*|*/var/run/docker*|*unix-socket*docker*)
             echo "ERROR: Access to Docker socket is blocked." >&2
-            if [ -n "$ATTDEF_AUDIT_LOG" ]; then
-                echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) BLOCKED curl $*" >> "$ATTDEF_AUDIT_LOG"
+            if [ -n "$PULSAR_AUDIT_LOG" ]; then
+                echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) BLOCKED curl $*" >> "$PULSAR_AUDIT_LOG"
             fi
             exit 1
             ;;
@@ -36,8 +36,8 @@ for arg in "$@"; do
         case "$arg" in
             *docker*|*/var/run/*)
                 echo "ERROR: Access to Docker socket is blocked." >&2
-                if [ -n "$ATTDEF_AUDIT_LOG" ]; then
-                    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) BLOCKED curl --unix-socket $arg" >> "$ATTDEF_AUDIT_LOG"
+                if [ -n "$PULSAR_AUDIT_LOG" ]; then
+                    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) BLOCKED curl --unix-socket $arg" >> "$PULSAR_AUDIT_LOG"
                 fi
                 exit 1
                 ;;

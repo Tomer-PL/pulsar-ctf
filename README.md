@@ -13,17 +13,17 @@ Built using real challenges from [DEF CON CTF Finals 2025](https://github.com/Na
 └──────────────┬──────────────────────────────┘
                │
    ┌───────────┼───────────┐
-   │           │           │
-┌──┴──┐    ┌──┴──┐    ┌──┴──┐
-│Claude│    │ GPT │    │Gemini│
-│ Agent│    │Agent│    │Agent │
-└──┬──┘    └──┬──┘    └──┬──┘
-   │          │          │
-┌──┴──┐   ┌──┴──┐   ┌──┴──┐
-│axis │   │axis │   │axis │    ← 3 services per team
-│ico  │   │ico  │   │ico  │    ← identical, independently exploitable
-│nilua│   │nilua│   │nilua│
-└─────┘   └─────┘   └─────┘
+   │                       │
+┌──┴──┐               ┌──┴──┐
+│Claude│               │ GPT │
+│ Agent│               │Agent│
+└──┬──┘               └──┬──┘
+   │                      │
+┌──┴──┐              ┌──┴──┐
+│axis │              │axis │    ← 3 services per team
+│ico  │              │ico  │    ← identical, independently exploitable
+│nilua│              │nilua│
+└─────┘              └─────┘
 ```
 
 - **3-minute ticks**, 20 rounds, 1-hour game
@@ -46,7 +46,7 @@ Built using real challenges from [DEF CON CTF Finals 2025](https://github.com/Na
 
 - Docker Desktop
 - Python 3.11+
-- At least one LLM CLI: [Claude Code](https://claude.ai/claude-code), [Codex CLI](https://github.com/openai/codex), or [Gemini CLI](https://github.com/google-gemini/gemini-cli)
+- API keys for LLM providers (see `.env.example`)
 
 ### 1. Clone challenges
 
@@ -54,54 +54,64 @@ Built using real challenges from [DEF CON CTF Finals 2025](https://github.com/Na
 git clone https://github.com/Nautilus-Institute/finals-2025.git challenges-source
 ```
 
-### 2. Start the game
+### 2. Configure API keys
+
+```bash
+cp .env.example .env
+# Edit .env with your API keys
+```
+
+### 3. Start the game
 
 ```bash
 pip install -r requirements.txt
 bash run_game.sh
 ```
 
-This builds 9 service containers (3 per team) + the game server.
+This builds 6 service containers (3 per team) + the game server.
 
-### 3. Launch agents
+### 4. Launch agents (containerized — recommended)
 
-Each in a separate terminal:
+Each agent runs in its own Docker container with no Docker access:
 
 ```bash
-# Claude (Sonnet 4.6 via API)
-python3 -u harnesses/claude/agent.py
-
-# GPT (Codex CLI)
-bash harnesses/run_loop.sh gpt
-
-# Gemini (Gemini CLI)
-bash harnesses/run_loop.sh gemini
+bash launch_agents.sh
 ```
 
-Or limit to N rounds:
+Monitor agent logs:
 
 ```bash
-bash harnesses/run_loop.sh gpt 5    # stop after 5 rounds
+docker compose logs -f agent-claude
+docker compose logs -f agent-gpt
 ```
 
-### 4. Watch
+### Alternative: host-based agents (legacy)
+
+Run agents directly on the host (requires LLM CLIs installed locally):
 
 ```bash
-# Live dashboard
-python3 dashboard.py
-open http://localhost:9999
+# Each in a separate terminal:
+python3 -u harnesses/claude/agent.py         # Claude (Sonnet 4.6 via API)
+bash harnesses/run_loop.sh gpt               # GPT (Codex CLI)
+bash harnesses/run_loop.sh gpt 5             # limit to N rounds
+```
 
-# Or just the scoreboard
-open http://localhost:8888
+### 5. Watch
+
+The dashboard starts automatically with `docker compose up`:
+
+```bash
+open http://localhost:9999    # live dashboard (scores, logs, attacks, audit)
+open http://localhost:8888    # scoreboard only
 ```
 
 ## Port Mappings
 
-| Service | Claude | GPT | Gemini |
-|---------|--------|-----|--------|
-| axis | localhost:14000 | localhost:24000 | localhost:34000 |
-| ico | localhost:14265 | localhost:24265 | localhost:34265 |
-| nilua | localhost:18080 | localhost:28080 | localhost:38080 |
+| Service | Claude | GPT |
+|---------|--------|-----|
+| axis | localhost:14000 | localhost:24000 |
+| ico | localhost:14265 | localhost:24265 |
+| nilua | localhost:18080 | localhost:28080 |
 
 Game server: `localhost:8888` · Dashboard: `localhost:9999`
 
@@ -128,17 +138,17 @@ curl localhost:8888/api/tick
 curl localhost:8888/api/attacks
 ```
 
-## Anti-Cheat
+## Agent Isolation
 
-LLM agents are restricted from using Docker directly:
+Each LLM agent runs in a dedicated Docker container for security:
 
-- `docker` CLI replaced with a blocking wrapper in PATH
-- `DOCKER_HOST` set to invalid socket
-- `curl --unix-socket /var/run/docker.sock` blocked
-- Python `subprocess`/`os.system` docker calls blocked
-- All blocked attempts logged to `logs/audit_<team>.log`
+- **No Docker CLI** installed in agent images
+- **No Docker socket** mounted — agents cannot access Docker at all
+- **Read-only source code** — `challenges-source` mounted as read-only
+- **Isolated patch volumes** — each agent writes patches to its own volume shared with the game server
+- **Network-only attacks** — agents reach services via Docker DNS names (e.g., `gpt-axis:4000`)
 
-Agents can only attack via network and patch via the game server API.
+For host-based runs, a software-based anti-cheat layer (PATH shadowing, env var overrides) provides equivalent restrictions. All blocked attempts are logged to `logs/audit_<team>.log`.
 
 ## Scoring
 
@@ -159,8 +169,6 @@ pytest tests/test_patch_validator.py tests/test_flag_manager.py tests/test_score
 pytest tests/test_flag_rotation_live.py tests/test_patch_deploy_live.py -v -s
 ```
 
-107 tests covering game logic, anti-cheat enforcement, flag rotation, and patch deployment.
-
 ## Architecture
 
 ```
@@ -174,17 +182,18 @@ pulsar-ctf/
 │   └── models.py           # Data models (teams, flags, config, game state)
 ├── harnesses/
 │   ├── system_prompt.md    # Game briefing template for LLM agents
-│   ├── run_loop.sh         # Continuous agent loop (GPT/Gemini)
+│   ├── entrypoint.sh       # Container entrypoint: renders prompt, launches agent
+│   ├── run_loop.sh         # Continuous agent loop (GPT)
 │   ├── claude/agent.py     # Claude agent via Anthropic API with tool use
-│   ├── codex/run.sh        # Codex CLI launcher
-│   ├── gemini/run.sh       # Gemini CLI launcher
-│   └── restricted/         # Anti-cheat: fake docker binary, curl wrapper
+│   ├── codex/run.sh        # Codex CLI launcher (host mode)
+│   └── restricted/         # Anti-cheat for host mode: fake docker binary
 ├── dashboard.py            # Live web UI: scores, logs, attack feed, audit
-├── docker-compose.yml      # 9 service containers + game server
+├── docker-compose.yml      # 6 services + game server + dashboard + 2 agents
 ├── Dockerfile.gameserver   # Game server with Docker CLI for flag planting
+├── Dockerfile.agent-*      # Agent containers (claude, gpt)
 ├── run_game.sh             # One-command game setup
-├── launch_agents.sh        # Launch all agents with logging
-└── tests/                  # 107 tests (unit + live integration)
+├── launch_agents.sh        # Launch agents (containerized or host mode)
+└── tests/                  # Unit + live integration tests
 ```
 
 ## License

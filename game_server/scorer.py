@@ -1,4 +1,4 @@
-"""Scoring engine for the AttDef game."""
+"""Scoring engine for the Pulsar game."""
 
 import logging
 

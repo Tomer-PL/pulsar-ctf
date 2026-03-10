@@ -10,6 +10,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./logs:/app/logs
       - ./challenges-source:/app/challenges-source
+      - claude-patches:/patches/claude
+      - gpt-patches:/patches/gpt
     networks:
       - game-net
     depends_on:
@@ -19,16 +21,13 @@ services:
       - gpt-axis
       - gpt-ico
       - gpt-nilua
-      - gemini-axis
-      - gemini-ico
-      - gemini-nilua
 
   # === CLAUDE team services ===
   claude-axis:
     build:
       context: ./challenges-source/axis
       dockerfile: Dockerfile
-    container_name: attdef-claude-axis
+    container_name: pulsar-claude-axis
     ports:
       - "14000:4000"
     networks:
@@ -38,7 +37,7 @@ services:
     build:
       context: ./challenges-source/ico
       dockerfile: Dockerfile
-    container_name: attdef-claude-ico
+    container_name: pulsar-claude-ico
     ports:
       - "14265:4265"
     networks:
@@ -49,9 +48,12 @@ services:
       context: ./challenges-source/nilua
       dockerfile: Dockerfile
       target: nilua
-    container_name: attdef-claude-nilua
+    platform: linux/amd64
+    container_name: pulsar-claude-nilua
     ports:
       - "18080:8080"
+    entrypoint: ["sh", "-c", "echo 'FLAG{placeholder}' > /flag && chmod 644 /flag && exec /challenge/nilua_server"]
+    user: root
     networks:
       - game-net
 
@@ -60,7 +62,7 @@ services:
     build:
       context: ./challenges-source/axis
       dockerfile: Dockerfile
-    container_name: attdef-gpt-axis
+    container_name: pulsar-gpt-axis
     ports:
       - "24000:4000"
     networks:
@@ -70,7 +72,7 @@ services:
     build:
       context: ./challenges-source/ico
       dockerfile: Dockerfile
-    container_name: attdef-gpt-ico
+    container_name: pulsar-gpt-ico
     ports:
       - "24265:4265"
     networks:
@@ -81,43 +83,77 @@ services:
       context: ./challenges-source/nilua
       dockerfile: Dockerfile
       target: nilua
-    container_name: attdef-gpt-nilua
+    platform: linux/amd64
+    container_name: pulsar-gpt-nilua
     ports:
       - "28080:8080"
+    entrypoint: ["sh", "-c", "echo 'FLAG{placeholder}' > /flag && chmod 644 /flag && exec /challenge/nilua_server"]
+    user: root
     networks:
       - game-net
 
-  # === GEMINI team services ===
-  gemini-axis:
+  # === Dashboard ===
+  dashboard:
     build:
-      context: ./challenges-source/axis
-      dockerfile: Dockerfile
-    container_name: attdef-gemini-axis
+      context: .
+      dockerfile: Dockerfile.dashboard
     ports:
-      - "34000:4000"
+      - "9999:9999"
+    environment:
+      - GAME_SERVER=http://game-server:8888
+      - LOG_DIR=/app/logs
+    volumes:
+      - ./logs:/app/logs:ro
     networks:
       - game-net
+    depends_on:
+      - game-server
 
-  gemini-ico:
-    build:
-      context: ./challenges-source/ico
-      dockerfile: Dockerfile
-    container_name: attdef-gemini-ico
-    ports:
-      - "34265:4265"
-    networks:
-      - game-net
+  # === LLM Agent Containers ===
+  # Each agent runs in its own container with NO Docker access.
+  # Security: no docker socket, no docker CLI, challenges-source mounted read-only.
 
-  gemini-nilua:
+  agent-claude:
     build:
-      context: ./challenges-source/nilua
-      dockerfile: Dockerfile
-      target: nilua
-    container_name: attdef-gemini-nilua
-    ports:
-      - "38080:8080"
+      context: .
+      dockerfile: Dockerfile.agent-claude
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GAME_SERVER=http://game-server:8888
+      - SOURCE_PATH=/app/challenges-source
+      - PATCH_PATH=/patches
+      - TEAM_ID=claude
+    volumes:
+      - ./challenges-source:/app/challenges-source:ro
+      - claude-patches:/patches
+      - ./logs:/app/logs
     networks:
       - game-net
+    depends_on:
+      - game-server
+
+  agent-gpt:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent-gpt
+    environment:
+      - GAME_SERVER=http://game-server:8888
+      - SOURCE_PATH=/app/challenges-source
+      - PATCH_PATH=/patches
+      - TEAM_ID=gpt
+    volumes:
+      - ./challenges-source:/app/challenges-source:ro
+      - gpt-patches:/patches
+      - ./logs:/app/logs
+      - ${CODEX_AUTH_JSON:-~/.codex/auth.json}:/root/.codex/auth.json:ro
+    networks:
+      - game-net
+    depends_on:
+      - game-server
+
+volumes:
+  claude-patches:
+  gpt-patches:
 
 networks:
   game-net:
